@@ -1,0 +1,13 @@
+### CHECK LEADER
+docker node ls -f "role=manager" | tail -n+2 | grep -i leader
+
+### DA ULTIMO MASTER
+watch 'clear ; docker node ls ; su - kadmin -c "kubectl get nodes"'
+
+### CHECK container sul nodo restartato
+while [ $(docker ps | grep Up | egrep -i 'starting|unhealthy' | grep -v CONTAINER |wc -l) -ne 0 ]
+do
+	clear
+	echo "Restart in progress..."
+	sleep 2
+done ; clear ; echo "### Restart COMPLETED ###" && docker ps

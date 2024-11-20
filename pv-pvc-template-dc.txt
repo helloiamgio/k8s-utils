@@ -1,0 +1,32 @@
+cat <<EOF | oc create -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: seca-inbound-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteMany
+  nfs:
+    path: /data 
+    server: 10.98.109.31
+  persistentVolumeReclaimPolicy: Retain
+EOF  
+---
+cat <<EOF | oc create -f -  	   
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seca-inbound-pvc
+  namespace: mf-search-engine-cert
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: seca-inbound-pv
+  storageClassName: ""
+EOF     
+---

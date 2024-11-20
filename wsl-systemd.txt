@@ -1,0 +1,7 @@
+vi /etc/wsl.conf
+[boot]
+systemd=true
+
+wsl.exe --shutdown
+
+systemctl list-unit-files --type=service

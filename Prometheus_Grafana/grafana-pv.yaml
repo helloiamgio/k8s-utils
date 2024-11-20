@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 2Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: grafana-pvc
+    namespace: app-hub
+  nfs:
+    path: /4415_COLL_SHARE
+    server: nas_nfs_koll.cariprpccoll.it
+  persistentVolumeReclaimPolicy: Recycle
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: grafana-pvc
+
+
+
+
+
+volumeMounts:
+  - name: grafana-data
+    mountPath: /var/lib/grafana    
+
+volumes:
+  - name: grafana-pvc
+    persistentVolumeClaim:
+      claimName: grafana-pvc

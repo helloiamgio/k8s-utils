@@ -1,0 +1,78 @@
+### ORDINE - 1) MASTER 2) DTR 3) WORKER ###
+
+***************************************** MKE BACKUP da TUTTI I NODI MASTER (verificare se esiste immagine mirantis/ucp:3.3.4 tramite 'docker image ls | grep "ucp:3.3.4"' ) **********************************************************************
+docker container run \
+    --rm \
+    --log-driver none \
+    --name ucp \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /var/tmp:/backup \
+    mirantis/ucp:3.3.4 backup \
+    --file $(hostname).tar \
+    --passphrase "secret12chars" \
+    --include-logs=false
+	
+gpg --decrypt /var/tmp/$(hostname).tar | tar --list
+
+*************************************** DTR BACKUP DA TUTTI I NODI WORKER DTR *********************************************************************************************************************************************************************
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-') && echo $REPLICA_ID
+sudo tar -cvf /var/tmp/image-backup.tar /var/lib/docker/volumes/dtr-registry-$REPLICA_ID
+
+DTR_VERSION=$(docker container inspect $(docker container ps -f name=dtr-registry -q) | \
+  grep -m1 -Po '(?<=DTR_VERSION=)\d.\d.\d'); \
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-'); \
+read -p 'mke-url (The MKE URL including domain and port): ' UCP_URL; \
+read -p 'mke-username (The MKE administrator username): ' UCP_ADMIN; \
+read -sp 'mke password: ' UCP_PASSWORD; \
+docker run --log-driver none -i --rm \
+  --env UCP_PASSWORD=$UCP_PASSWORD \
+  mirantis/dtr:$DTR_VERSION backup \
+  --ucp-username $UCP_ADMIN \
+  --ucp-url $UCP_URL \
+  --ucp-insecure-tls \
+  --existing-replica-id $REPLICA_ID > dtr-metadata-${DTR_VERSION}-backup-$(date +%Y%m%d-%H_%M_%S).tar
+  
+
+### CHECK MASTER LEADER (lasciare il LEADER per ultimo) da root
+docker node ls -f "role=manager" | tail -n+2 | grep -i leader
+
+### DA NODO MASTER LEADER ###
+watch 'clear ; docker node ls ; su - kadmin -c "kubectl get nodes"'
+
+### DA NODI MASTER & WORKER + DTR ### 
+systemctl stop docker
+reboot
+
+### SUL NODO RESTARTATO ###
+while [ $(docker ps | grep Up | egrep -i 'starting|unhealthy' | grep -v CONTAINER |wc -l) -ne 0 ]
+do
+	clear
+	echo "Restart in progress..."
+	sleep 2
+done ; echo "### Restart COMPLETED ###" && docker ps
+
+### DA NODO MASTER 
+docker node update --availability drain $NODE_NAME
+
+### NODI WORKER ###
+systemctl stop docker
+reboot
+
+### SUL NODO RESTARTATO ###
+while [ $(docker ps | grep Up | egrep -i 'starting|unhealthy' | grep -v CONTAINER |wc -l) -ne 0 ]
+do
+	clear
+	echo "Restart in progress..."
+	sleep 2
+done ; echo "### Restart COMPLETED ###" && docker ps
+
+### DA NODO MASTER 
+docker node update --availability active $NODE_NAME
+
+### CHECK DA NODO MASTER per POD RUNNING
+su - kadmin 
+kubectl get pods -A | egrep -v 'Running|Completed'
+
+
+  
+  

@@ -1,0 +1,54 @@
+#!/bin/bash
+###
+###     SHELL TO BACKUP K8s
+###
+### Backup certificates
+export DATE=$(date +%Y%m%d)
+echo "BACKUP CERTIFICATE..." ; sleep 5
+echo "sudo cp -r /etc/kubernetes/pki $HOME/backup-$DATE/"
+sudo cp -r /etc/kubernetes/pki $HOME/backup-$DATE/
+echo "DONE"
+echo "BACKUP ETCD..." ; sleep 5
+### etcd snapshot
+sudo docker run --rm -v $HOME/backup-$DATE:/backup-$DATE \
+    --network host \
+    -v /etc/kubernetes/pki/etcd:/etc/kubernetes/pki/etcd \
+    --env ETCDCTL_API=3 \
+    k8s.gcr.io/etcd:3.4.3-0 \
+    etcdctl --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+    --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+    snapshot save /backup-$DATE/etcd-snapshot-latest.db
+echo "DONE"
+### Backup kubeadm-config
+echo "BACKUP KUBEADM-CONFIG..." ; sleep 5
+echo "kubectl get cm kubeadm-config  -n kube-system -o yaml > $HOME/backup-$DATE/kubeadm-config.yaml"
+kubectl get cm kubeadm-config  -n kube-system -o yaml > $HOME/backup-$DATE/kubeadm-config.yaml
+echo "DONE"
+exit 0
+
+
+#!/bin/bash
+###
+###	SHELL TO RESTORE K8s
+###
+### Restore certificates
+sudo cp -r $HOME/backup/pki /etc/kubernetes/
+
+### Restore etcd backup
+sudo mkdir -p /var/lib/etcd
+sudo docker run --rm \
+    -v $(pwd)/backup:/backup \
+    -v /var/lib/etcd:/var/lib/etcd \
+    --env ETCDCTL_API=3 \
+    k8s.gcr.io/etcd:3.4.3-0 \
+    /bin/sh -c "etcdctl snapshot restore '/backup/etcd-snapshot-latest.db' ; mv /default.etcd/member/ /var/lib/etcd/"
+
+# Restore kubeadm-config
+sudo mkdir /etc/kubeadm
+sudo cp backup/kubeadm-config.yaml /etc/kubeadm/
+
+# Initialize the master with backup
+sudo kubeadm init --ignore-preflight-errors=DirAvailable--var-lib-etcd \
+    --config /etc/kubeadm/kubeadm-config.yaml

@@ -1,0 +1,11 @@
+Per esempio, per scaricare e installare il chart di Prometheus con un solo comando, puoi utilizzare la seguente sintassi:
+
+Copy code
+helm fetch --untar --untardir=path/to/chart-directory stable/prometheus && helm install prometheus path/to/chart-directory/prometheus -f path/to/prometheus-values.yaml
+In questo esempio, il comando helm fetch scarica il chart di Prometheus in una cartella specificata, quindi il comando helm install installa il chart utilizzando i valori specificati nel file prometheus-values.yaml.
+
+Analogamente, per scaricare e installare il chart di Grafana in un unico comando:
+
+Copy code
+helm fetch --untar --untardir=path/to/chart-directory stable/grafana && helm install grafana path/to/chart-directory/grafana -f path/to/grafana-values.yaml
+È importante notare che questi comandi devono essere eseguiti dalla stessa directory in cui sono stati scaricati i chart, altrimenti il comando "helm install" non troverà i chart.

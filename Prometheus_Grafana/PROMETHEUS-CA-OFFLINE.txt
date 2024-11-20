@@ -1,0 +1,217 @@
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm fetch prometheus-community/kube-prometheus-stack
+
+inventory
+ls -l /RGP/INVENTORY-K8S && read -p "Inserisci il cluster : " CLUSTER 
+
+ansible master -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA/CHARTS/kube-prometheus-stack-48.2.3.tgz dest=/tmp/" -b
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA/DOCKER_IMAGES/) ;  do ansible all -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA/DOCKER_IMAGES/$i dest=/tmp" ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA/DOCKER_IMAGES/) ; do ansible all -i $CLUSTER -m shell -a "docker load -i /tmp/$i" -b ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA/DOCKER_IMAGES/) ; do ansible all -i $CLUSTER -m file -a "path=/tmp/$i state=absent" -b ; done
+
+helm install prometheus /tmp/kube-prometheus-stack-48.2.3.tgz --create-namespace --namespace kube-prometheus-stack
+
+k create ns kube-prometheus-stack
+k create -f kube-prometheus-stack-pv.yaml -n kube-prometheus-stack
+k create -f kube-prometheus-stack-pvc.yaml -n kube-prometheus-stack
+helm install prometheus /tmp/kube-prometheus-stack-48.2.3.tgz -n kube-prometheus-stack --set=alertmanager.persistentVolume.existingClaim=kube-prometheus-stack-pvc,server.persistentVolume.existingClaim=kube-prometheus-stack-pvc,grafana.persistentVolume.existingClaim=kube-prometheus-stack-pvc
+
+
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op":"replace","path":"/spec/type","value":"NodePort"}]' -n kube-prometheus-stack
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op": "add", "path":"/spec/ports/0/nodePort", "value":33333}]' -n kube-prometheus-stack
+
+
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}'
+for i in $(k get deployment -n monitoring --no-headers -o name) ; do k patch $i -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}' ; done
+
+Password -->
+kubectl get secret --namespace monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+Reset Password -->
+
+NAMESPACE=monitoring
+POD_NAME=$(kubectl get pods  -o=name -n "${NAMESPACE}" | grep grafana | cut -f2 -d/) && echo $POD_NAME
+kubectl exec -it -n "${NAMESPACE}" "${POD_NAME}" -- /bin/sh -c "/usr/share/grafana/bin/grafana-cli admin reset-admin-password ${POD_NAME}"
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+cat << EOF | kubectl apply -f -
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+EOF
+
+
+kube-prometheus-stack-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kube-prometheus-stack-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: my-local-storage	
+  local:
+    path: "/RGP/GRAFANA"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - grpi-acm-kv06.cariprpccoll.it	
+---
+kube-prometheus-stack-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kube-prometheus-stack-pvc
+  namespace: kube-prometheus-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: kube-prometheus-stack-pv	
+  
+ #######################################################
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 2Gi
+  hostPath:
+    path: /tmp/
+    type: DirectoryOrCreate
+  storageClassName: '' 
+
+StorageSpec
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#!/bin/bash
+
+read -p "Inserisci l'indirizzo IP o l'hostname della VM offline: " VM_OFFLINE_IP
+
+TMP_DIR="/tmp/docker_images"
+mkdir -p $TMP_DIR
+
+PODS=$(kubectl get pods -n monitoring -o jsonpath='{.items[*].metadata.name}')
+
+for POD_NAME in $PODS; do
+    IMAGES=$(kubectl get pod $POD_NAME -n monitoring -o jsonpath='{.spec.containers[*].image}')
+    
+    for IMAGE in $IMAGES; do
+        docker pull $IMAGE
+        
+        IMAGE_NAME=$(basename $IMAGE)
+        
+       docker save -o $TMP_DIR/$IMAGE_NAME.tar $IMAGE
+    done
+done
+
+scp -r $TMP_DIR root@$VM_OFFLINE_IP:/tmp
+
+echo "Sulla VM offline, esegui il seguente comando per caricare le immagini Docker:"
+echo "for image_tar in /tmp/docker_images/*.tar; do docker load -i \$image_tar; done"
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm fetch prometheus-community/kube-prometheus-stack
+
+inventory
+ls -l /RGP/INVENTORY-K8S && read -p "Inserisci il cluster : " CLUSTER 
+
+ansible master -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-58/CHARTS/kube-prometheus-stack-58.1.2.tgz dest=/tmp/" -b
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-58/DOCKER_IMAGES) ;  do ansible all -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-58/DOCKER_IMAGES/$i dest=/tmp" ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-58/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m shell -a "docker load -i /tmp/$i" -b ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-58/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m file -a "path=/tmp/$i state=absent" -b ; done
+
+helm install prometheus /tmp/kube-prometheus-stack-58.1.0.tgz --create-namespace --namespace kube-prometheus-stack
+
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op":"replace","path":"/spec/type","value":"NodePort"}]' -n kube-prometheus-stack
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op": "add", "path":"/spec/ports/0/nodePort", "value":33333}]' -n kube-prometheus-stack
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}'
+for i in $(k get deployment -n kube-prometheus-stack --no-headers -o name) ; do k patch $i -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/worker":"true"}}}}}' ; done
+
+k create ns kube-prometheus-stack
+k create -f kube-prometheus-stack-pv.yaml -n kube-prometheus-stack
+k create -f kube-prometheus-stack-pvc.yaml -n kube-prometheus-stack
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+v56.0
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm fetch prometheus-community/kube-prometheus-stack
+
+inventory
+ls -l /RGP/INVENTORY-K8S && read -p "Inserisci il cluster : " CLUSTER 
+
+ansible master -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-56/CHARTS/kube-prometheus-stack-56.21.3.tgz dest=/tmp/" -b
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-56/DOCKER_IMAGES) ;  do ansible all -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-56/DOCKER_IMAGES/$i dest=/tmp" ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-56/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m shell -a "docker load -i /tmp/$i" -b ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-56/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m file -a "path=/tmp/$i state=absent" -b ; done
+
+helm install prometheus /tmp/kube-prometheus-stack-56.1.0.tgz --create-namespace --namespace kube-prometheus-stack
+
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op":"replace","path":"/spec/type","value":"NodePort"}]' -n kube-prometheus-stack
+kubectl -n monitoring patch svc prometheus-grafana --type='json' -p '[{"op": "add", "path":"/spec/ports/0/nodePort", "value":33333}]' -n kube-prometheus-stack
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}'
+for i in $(k get deployment -n kube-prometheus-stack --no-headers -o name) ; do k patch $i -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/worker":"true"}}}}}' ; done
+
+k create ns kube-prometheus-stack
+k create -f kube-prometheus-stack-pv.yaml -n kube-prometheus-stack
+k create -f kube-prometheus-stack-pvc.yaml -n kube-prometheus-stack
+
+
+inventory
+ls -l /RGP/INVENTORY-K8S && read -p "Inserisci il cluster : " CLUSTER 
+
+ansible master -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-12/CHARTS/kube-prometheus-0.12.tar.gz dest=/tmp/" -b
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-12/DOCKER_IMAGES) ;  do ansible all -i $CLUSTER -m copy -a "src=/RGP/repos/PROMETHEUS-CA-12/DOCKER_IMAGES/$i dest=/tmp" ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-12/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m shell -a "docker load -i /tmp/$i" -b ; done
+for i in $(ls -1 /RGP/repos/PROMETHEUS-CA-12/DOCKER_IMAGES) ; do ansible all -i $CLUSTER -m file -a "path=/tmp/$i state=absent" -b ; done
+
+tar xvf /tmp/kube-prometheus-0.12.tar.gz && cd /tmp/kube-prometheus
+
+kubectl apply --server-side -f manifests/setup
+kubectl wait \
+	--for condition=Established \
+	--all CustomResourceDefinition \
+	--namespace=monitoring
+kubectl apply -f manifests/
+
+kubectl -n monitoring patch svc grafana --type='json' -p '[{"op":"replace","path":"/spec/type","value":"NodePort"}]' -n monitoring
+kubectl -n monitoring patch svc grafana --type='json' -p '[{"op": "add", "path":"/spec/ports/0/nodePort", "value":33333}]' -n monitoring
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}'
+for i in $(k get deployment -n monitoring --no-headers -o name) ; do k patch $i -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}' ; done
+
+k create ns kube-prometheus-stack
+k create -f kube-prometheus-stack-pv.yaml -n kube-prometheus-stack
+k create -f kube-prometheus-stack-pvc.yaml -n kube-prometheus-stack
+
+### REMOVE
+kubectl delete --ignore-not-found=true -f manifests/ -f manifests/setup

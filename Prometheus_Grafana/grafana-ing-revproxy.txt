@@ -1,0 +1,60 @@
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+    name: ingress-grafana
+    namespace: monitoring
+  spec:
+    ingressClassName: nginx-default
+    rules:
+    - host: backend-msm-plain-kb1.cariprpccoll.it
+      http:
+        paths:
+        - backend:
+            service:
+              name: prometheus-grafana
+              port:
+                number: 80
+          path: /grafana(/|$)(.*)
+          pathType: ImplementationSpecific
+    - host: backend-msm-plain.cariprpccoll.it
+      http:
+        paths:
+        - backend:
+            service:
+              name: prometheus-grafana
+              port:
+                number: 80
+          path: /grafana(/|$)(.*)
+EOF		  
+
+--- 
+
+k get cm prometheus-grafana -o template='{{ index .data "grafana.ini" }}' > grafana.ini
+
+grafana.ini
+[analytics]
+check_for_updates = true
+[grafana_net]
+url = https://grafana.net
+[log]
+mode = console
+[paths]
+data = /var/lib/grafana/
+logs = /var/log/grafana
+plugins = /var/lib/grafana/plugins
+provisioning = /etc/grafana/provisioning
+[server]
+#domain = ''
+#domain = 'backend-msm-plain.cariprpccoll.it'
+#root_url = ‘%(protocol)s://%(domain)s:%(http_port)s/grafana’
+root_url = https://backend-msm-plain.cariprpccoll.it/grafana
+#serve_from_sub_path =  true
+
+k create cm prometheus-grafana --from-file=grafana.ini
+
+

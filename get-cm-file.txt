@@ -1,0 +1,8 @@
+$ kubectl get cm my-configmap -o "jsonpath={.data['my-config\.yaml']}"
+keyA:
+  keyB: a-value
+Example with go-template:
+
+$ kubectl get cm my-configmap -o 'go-template={{index .data "my-config.yaml"}}'
+keyA:
+  keyB: a-value

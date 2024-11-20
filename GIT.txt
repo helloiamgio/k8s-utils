@@ -1,0 +1,40 @@
+### Inizializzare un repository locale: 
+git init
+
+### Aggiungere file al repository: 
+git add <file> o git add . per preparare tutti i file per il commit
+
+### Fare un commit: 
+git commit -m "messaggio di commit"
+
+### Push verso un repository remoto:
+
+### Aggiungere un repository remoto: 
+git remote add origin <repo_url>
+
+### Fare una prima push: 
+git push -u origin master
+
+### Fare una push successiva: 
+git push
+
+### Scaricare un repository remoto: 
+git clone <repo_url>
+
+### Mostrare lo stato del repository: 
+git status
+
+### Mostrare la cronologia dei commit: 
+git log
+
+### Tornare a una versione precedente: 
+git checkout <commit_hash> (sostituire <commit_hash> con l'hash del commit)
+
+### Confrontare le differenze tra due versioni: 
+git diff <commit_hash1> <commit_hash2>
+
+### Creare un nuovo branch: 
+git branch <nome_branch>
+
+### Cambiare branch: 
+git checkout <nome_branch>

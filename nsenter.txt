@@ -1,0 +1,6 @@
+PID=$(docker inspect <ID CONTAINER> -f '{{ .State.Pid }}')
+nsenter -n -t $PID -- curl http://localhost:8080/health
+
+
+kubectl run multitool --image=praqma/network-multitool --image-pull-policy=Never --restart=Never
+kubectl create deployment multitool --image=praqma/network-multitool 

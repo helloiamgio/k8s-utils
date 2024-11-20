@@ -1,0 +1,25 @@
+
+* Take an MKE backup from the source environment https://docs.mirantis.com/mke/3.5/ops/disaster-recovery/backup-mke.html
+* Restore to destination first manager node https://docs.mirantis.com/mke/3.5/ops/disaster-recovery/restore-mke.html
+* The rest of the nodes can be added/promoted later
+
+Please pay attention: you should not try to restore the swarm state, as new DC IP addresses will be changed, and your swarm cluster depends on IPs that the swarm was created early in this scenario.
+
+If you are firmly sure that the internal (from the MKE cluster perspective) infrastructure will not be changed when you migrate a bunch of VMs to a new DC, the steps should be as follow:
+* stop ordinary worker nodes first
+* stop MSR nodes
+* stop manager nodes; the leader one should be stopped last
+* move them to the new DC
+* first start any manager and check if start correctly
+* start rest of your manager nodes
+* start first MSR and check if it starts correctly
+* start rest of your MSR nodes
+* start worker nodes
+
+In any scenario be ensure that you have good backups of everything that should involve having the ability to revert to work quickly.
+
+ It depends on the underlying hosts' configuration. If OS configuration will not be changed at any position then you can just gracefully shut down all, copy/move to a new place, and start it again. Nothing changed from the Swarm/MKE perspective in this case.
+
+If the above-mentioned configs may be changed then you need to use "restore/backup" or "green/blue deployment" methods.
+
+The detailed plan is beyond the usual Technical Support scope. If you need to get it to contact your AE that he/she can arrange resources from  Mirantis Professional Services for your needs.

@@ -1,0 +1,10 @@
+katafygio :
+
+export GODEBUG=x509ignoreCN=0; katafygio --no-git --dump-only  --exclude-kind events,nodes,endpoints,endpointslice,pod,replicaset --local-dir $HOME/k8s-backup/backup-$(date -I)
+
+export GODEBUG=x509ignoreCN=0; katafygio \
+  --local-dir $HOME/k8s-backup/backup-$(date -I) \
+  --no-git \
+  --dump-only \
+  --exclude-kind events,nodes,endpoints, endpointslice \
+  --namespace mobius
