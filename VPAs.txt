@@ -1,0 +1,52 @@
+k create secret docker-registry dtr-account --docker-username=docker --docker-password=docker123 --docker-server=multichannel-dtr.cariprpccoll.it
+
+imagePullSecrets:
+  - name: dtr-account
+
+helloiamgio/vpa-updater:0.8.1
+helloiamgio/vpa-admission-controller:0.8.1
+helloiamgio/vpa-recommender:0.8.1
+
+IfNotPresent
+
+
+---
+apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: cms-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: cms
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        controlledResources: ["cpu", "memory"]
+
+		
+---
+apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: offloading-data-access-saldo-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: offloading-data-access-saldo
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: 100m
+          memory: 50Mi
+        maxAllowed:
+          cpu: 1
+          memory: 500Mi
+        controlledResources: ["cpu", "memory"]		

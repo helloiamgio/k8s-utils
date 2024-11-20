@@ -1,0 +1,8 @@
+### Gets alertmanager URL
+oc get route alertmanager-main -n openshift-monitoring
+
+ALERT_MANAGER=$(oc get route alertmanager-main -n openshift-monitoring -o jsonpath='{@.spec.host}')
+
+### Gets fired alerts
+curl -k -H "Authorization: Bearer $(oc create token prometheus-k8s -n openshift-monitoring)" \
+"https://$ALERT_MANAGER/api/v1/alerts" | jq '.data[] | {alert: .labels.alertname, status: .status.state, description: .annotations.description}'

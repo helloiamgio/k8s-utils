@@ -1,0 +1,27 @@
+### show labels
+docker container ls --format "table {{.ID}}\t{{.Labels}}" 
+
+docker image ls -a --filter "not label=com.docker.ucp.version=3.5.3"
+
+docker image prune --filter label!=com.docker.dtr.version: 2.9.7
+
+docker image prune --filter label!=com.docker.ucp.version=3.5.3 --filter label!=com.docker.dtr.version:2.9.7
+
+docker image prune --filter label!=com.docker.ucp.version=3.5.9 --filter label!=com.docker.dtr.version:2.9.10
+
+docker image prune --filter label!=com.docker.ucp.version=3.6.6 --filter label!=com.docker.dtr.version:2.9.13
+
+
+--filter label!=com.docker.dtr.version:2.9.13
+
+
+docker image prune --filter label!=com.docker.ucp.version=3.6.9 --filter label!=com.docker.dtr.version:2.9.13
+
+docker image prune --filter label=com.docker.ucp.version=3.2.1 -a ; docker image prune --filter label=com.docker.ucp.version=3.4.4 -a ; docker image prune --filter label=com.docker.ucp.version=3.3.4 -a 
+
+### clean pre upgrade
+docker image prune --filter label=com.docker.dtr.version:2.8.4 -a
+docker image prune --filter label=com.docker.ucp.version=3.2.1 -af && docker image prune --filter label=com.docker.ucp.version=3.3.4 -af && docker image prune --filter label=com.docker.ucp.version=3.4.4 -af
+
+
+docker image ls | grep "2.7.6" | awk '{print $1":"$2}' | xargs docker rmi

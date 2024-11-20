@@ -1,0 +1,1 @@
+for NS in 3i-scrivaniadigitale-mgw 3j-schedacliente-mgw 3y-openfinance-mgw 4a-ddc-mgw 4e-componentitrasversali-mgw ak-mgw ap-anagrafe-mgw cv-dol-mgw dn-gestionipatrimoniali-mgw mb-mutui-mgw qc-cardplus-mgw r3g-openinsurance-mgw ti-titoli-mgw; do oc adm policy add-cluster-role-to-group admin-and-loki CN=GU_OCP_PROFESIA,CN=Users,DC=cariprpcpar,DC=it -n $NS; done

@@ -1,0 +1,46 @@
+# 1. Aggiornare il sistema
+sudo dnf update -y
+
+# 2. Installare Podman
+sudo dnf install -y podman
+
+# 3. Installare il plugin dnsname per Podman
+sudo dnf install -y podman-dnsname
+
+# 4. Abilitare il modulo per Python 3.9 (se necessario)
+sudo dnf module install python39
+
+# 5. Verificare l'installazione di Python 3
+python3 --version
+
+# 6. Installare pip per Python 3.9 (se non già installato)
+sudo dnf install -y python39-pip
+
+# 7. Installare PyYAML e python-dotenv
+pip3 install --user PyYAML
+pip3 install --user python-dotenv
+
+# 8. Installare podman-compose
+sudo dnf install -y podman-compose
+
+# 9. Modificare lo script di podman-compose per usare Python 3.9
+sudo nano /usr/local/sbin/podman-compose
+# Modifica la prima riga in:
+#!/usr/bin/env python3.9
+
+# 10. Verificare che podman-compose funzioni correttamente
+podman-compose --help
+
+
+### Scarica i pacchetti connesso a internet:
+
+DOWNLOAD_DIR=./packages
+
+mkdir -p $DOWNLOAD_DIR
+
+pip3 download -d $DOWNLOAD_DIR numpy pandas
+
+scp -r ./packages user@host_offline:/path/to/destination
+PACKAGE_DIR=/path/to/destination/packages
+
+pip3 install --no-index --find-links $PACKAGE_DIR numpy pandas

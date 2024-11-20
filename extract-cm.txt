@@ -1,0 +1,5 @@
+kubectl get cm app-config \
+  -o go-template='{{index .data "config.json"}}' > config.json
+
+ kubectl get cm 3-2-0-wso2apim-devportal-conf \
+ -o jsonpath='{.data.deployment\.toml}' > deployment.toml

@@ -1,0 +1,12 @@
+runningImages=$(docker ps --format {{.Image}})
+docker images --format "{{.ID}} {{.Repository}}:{{.Tag}}" | grep -v "$runningImages"
+
+
+#FS per container
+
+
+
+# Immagini docker per size
+docker images --format 'table {{.Repository}}\t{{.ID}}\t{{.Tag}}\t{{.Size}}' | (read -r; printf "%s\n" "$REPLY"; sort -h -k7)
+
+

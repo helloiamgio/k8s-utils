@@ -1,0 +1,48 @@
+Per aggiungere una label "app=invydio" ai 3 nodi specifici "grpi-kb1-kv21", "grpi-kb1-kv22" e "grpi-kb1-kv23", è possibile utilizzare il comando kubectl label. Ecco un esempio di come utilizzare il comando per aggiungere la label "app=invydio" ai 3 nodi:
+
+Copy code
+kubectl label nodes grpi-kb1-kv21 app=invydio
+kubectl label nodes grpi-kb1-kv22 app=invydio
+kubectl label nodes grpi-kb1-kv23 app=invydio
+Se si vuole utilizzare la label "app=invydio" per schedulare i pod invece della label "nodename" bisogna semplicemente modificare la sezione nodeSelector del Deployment da
+
+Copy code
+nodeSelector:
+  nodename: grpi-kb1-kv21
+  nodename: grpi-kb1-kv22
+  nodename: grpi-kb1-kv23
+a
+
+Copy code
+nodeSelector:
+        app: invydio
+
+kubectl label nodes grpi-kb1-kv21 app-
+kubectl label nodes grpi-kb1-kv22 app-
+kubectl label nodes grpi-kb1-kv23 app-
+
+oppure 
+
+kubectl label nodes grpi-kb1-kv21 -app=invydio
+kubectl label nodes grpi-kb1-kv22 -app=invydio
+kubectl label nodes grpi-kb1-kv23 -app=invydio
+
+In caso voglia rimuovere la label dall'intero cluster si può utilizzare 
+kubectl label nodes --all app-
+
+oppure 
+
+kubectl label nodes --all -app=invydio
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"app":"apphub"}}}}}'
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/worker":"true"}}}}}'
+kubectl patch deployment <nome-del-deployment> -p '{"spec":{"template":{"spec":{"nodeSelector":null}}}}'
+
+kubectl patch deployment <nome-del-tuo-deployment> --type='json' -p='[{"op": "remove", "path": "/spec/template/spec/nodeSelector/node-role.kubernetes.io~1worker"}]'
+kubectl patch deployment <nome-del-tuo-deployment> --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/nodeSelector", "value": {"app": "apphub"}}]'
+
+
+kubectl patch deployment my-deployment -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}'
+for i in $(k get deployment -n monitoring --no-headers -o name) ; do k patch $i -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/DTR":"DTR"}}}}}' ; done
+
+kubectl get deployment my-deployment -o jsonpath={.spec.template.spec.nodeSelector}

@@ -1,0 +1,1 @@
+oc get deployment -n my-namespace -o custom-columns=NAME:.metadata.name,SIDECAR_INJECT:.spec.template.metadata.labels.sidecar\\.istio\\.io/inject

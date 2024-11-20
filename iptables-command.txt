@@ -1,0 +1,15 @@
+there would not be any "leftover" rules after flushing every table. In the interest of being thorough however, you may want to set the policy for the built-in INPUT and FORWARD chains to ACCEPT, as well:
+
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -t nat -F
+iptables -t mangle -F
+iptables -F
+iptables -X
+
+iptables -vnxL
+
+iptables-save | tee iptables_backup.conf ### | grep -v '\-A' | iptables-restore
+iptables-restore < iptables_backup.conf
+

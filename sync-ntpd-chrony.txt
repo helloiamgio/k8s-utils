@@ -1,0 +1,33 @@
+Usually in this situation it is required to make sure that you operate a time-synchronization daemon in all cluster nodes and clocks on all nodes are synchronized within <1sec of skew from one another 
+
+1.	Make sure to check that you have only either ntp.service or chronyd.service on each of your nodes 
+1.	systemctl status ntpd
+2.	systemctl status chronyd
+
+2.	Make sure the contents of the config files (either /etc/chrony.conf or /etc/ntp.conf ) are identical for all nodes , pointing to the same NTP pool server(s).
+3.	Check the output (for all nodes) of "timedatectl status" and see that you have "Network time on : yes" and "NTP Synchronized : yes" there, and all nodes are on the same time zone
+
+4.	On the nodes inspect outputs of the following: 
+NTP: 
+ntpq -p 
+
+	Check offset and jitter values - the offset of server relative to this host and jitter
+
+o	Chrony: 
+chronyc tracking 
+
+	Check System time value - the remaining correction that needs to be applied to the system clock
+chronyc sourcestats
+
+Try to identify which nodes have the issue, how big is the difference, is it growing or opposite, etc. Maybe there is an issue with one of your NTP servers? Or network issues affecting connectivity between your NTP servers and nodes?
+
+In any case if you would need to sync the node clocks manually and NTP servers are reachable, you can do the following: 
+•	NTP: 
+o	ntpdate can be run manually as necessary to set the host clock, for example "sudo ntpdate pool.ntp.org" (or use your local NTP server instead)
+
+•	Chrony: 
+o	to step the system clock immediately, bypassing any adjustments in progress by slewing, issue the following command as root: "chronyc makestep"
+
+Generally our recommendations for configuring the time synchronisation are provided in our doc at https://docs.mirantis.com/mke/3.6/install/predeployment/configure-sync.html and as you understand this is not a part of our product's functionality.
+Still let us know if you could find and resolve the issue using the approach provided above and if not we will try to provide our advice.
+Looking forward to your reply.

@@ -1,0 +1,12 @@
+VIP
+curl -k -v --resolve confluent-restproxy.cariprpc.it:443:10.215.88.31 https://confluent-restproxy.cariprpc.it
+ 
+OCP no1di
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.211 https://confluent-restproxy.cariprpc.it:30002
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.133 https://confluent-restproxy.cariprpc.it:30002
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.150 https://confluent-restproxy.cariprpc.it:30002
+ 
+OCP2 nodi
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.155 https://confluent-restproxy.cariprpc.it:30002
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.156 https://confluent-restproxy.cariprpc.it:30002
+curl -k -v --resolve confluent-restproxy.cariprpc.it:30002:10.215.88.157 https://confluent-restproxy.cariprpc.it:30002

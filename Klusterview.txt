@@ -1,0 +1,14 @@
+inventory
+ls -l /RGP/INVENTORY-K8S && read -p "Inserisci il cluster : " CLUSTER 
+
+head -2 collaudo-kb1
+
+scp -r /RGP/repos/KLUSTERVIEW/IMAGES/SETUP/KlusterView grpi-kb1-kv00.cariprpccoll.it:/tmp
+
+for i in $(ls -1 /RGP/repos/KLUSTERVIEW/IMAGES) ;  do ansible all -i $CLUSTER -m copy -a "src=/RGP/repos/KLUSTERVIEW/IMAGES/$i dest=/tmp" ; done
+for i in $(ls -1 /RGP/repos/KLUSTERVIEW/IMAGES) ; do ansible all -i $CLUSTER -m shell -a "docker load -i /tmp/$i" -b ; done
+for i in $(ls -1 /RGP/repos/KLUSTERVIEW/IMAGES) ; do ansible all -i $CLUSTER -m file -a "path=/tmp/$i state=absent" -b ; done
+
+
+
+kubectl patch deployment grafana -p '{"spec":{"template":{"spec":{"containers":[{"name":"my-container","imagePullPolicy":"IfNotPresent"}]}}}}'

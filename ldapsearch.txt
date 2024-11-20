@@ -1,0 +1,6 @@
+
+(memberOf=CN=GU_OCP_PROFESIA,CN=Users,DC=cariprpc,DC=it)
+
+ldapsearch -x -b DC=cariprpc,DC=it -H ldaps://msad1.cariprpc.it -D "CN=cp_4462_ocp_ldap,OU=OU-UTENTI-SERVIZI,OU=OU-UTENTI,DC=cariprpc,DC=it" -W sAMAccountName=J53134    
+
+ldapsearch -x -H ldaps://msad1.cariprpc.it -D "CN=cp_4462_ocp_ldap,OU=OU-UTENTI-SERVIZI,OU=OU-UTENTI,DC=cariprpc,DC=it" -b "DC=cariprpc,DC=it" -W "(&(objectClass=user)(memberOf=CN=GU_OCP_PROFESIA,CN=Users,DC=cariprpc,DC=it))" sAMAccountName

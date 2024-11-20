@@ -1,0 +1,57 @@
+### Backup SWARM ### --> MANAGER NON LEADER
+docker node ls -f "role=manager" | tail -n+2 | grep -vi leader
+
+ENGINE=$(docker version -f '{{.Server.Version}}')
+systemctl stop docker
+tar cvzf "/var/tmp/swarm-${ENGINE}-$(hostname -s)-$(date +%s%z).tgz" /var/lib/docker/swarm/
+#tar cvzf "/var/tmp/swarm-${ENGINE}-$(hostname -s)-$(date +%s%z).tgz" /RGP/docker/swarm/
+systemctl start docker
+watch docker ps -f name=ucp
+
+
+### MKE BACKUP da MASTER ###
+docker container run \
+    --rm \
+    --log-driver none \
+    --name ucp \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /var/tmp:/backup \
+    mirantis/ucp:3.5.3 backup \
+    --file $(hostname).tar \
+    --passphrase "secret12chars" \
+    --include-logs=false
+	
+gpg --decrypt /var/tmp/$(hostname).tar | tar --list
+
+### DTR BACKUP da Worker DTR ###
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-') && echo $REPLICA_ID
+sudo tar -cvf /var/tmp/image-backup.tar /var/lib/docker/volumes/dtr-registry-$REPLICA_ID
+
+DTR_VERSION=$(docker container inspect $(docker container ps -f name=dtr-registry -q) | \
+  grep -m1 -Po '(?<=DTR_VERSION=)\d.\d.\d0'); \
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-'); \
+read -p 'mke-url (The MKE URL including domain and port): ' UCP_URL; \
+read -p 'mke-username (The MKE administrator username): ' UCP_ADMIN; \
+read -sp 'mke password: ' UCP_PASSWORD; \
+docker run --log-driver none -i --rm \
+  --env UCP_PASSWORD=$UCP_PASSWORD \
+  mirantis/dtr:$DTR_VERSION backup \
+  --ucp-username $UCP_ADMIN \
+  --ucp-url $UCP_URL \
+  --ucp-insecure-tls \
+  --existing-replica-id $REPLICA_ID > /RGP/dtr-metadata-${DTR_VERSION}-backup-$(date +%Y%m%d-%H_%M_%S).tar
+
+### katafygio ###   
+export GODEBUG=x509ignoreCN=0; katafygio --no-git --dump-only --local-dir $HOME/k8s-backup/backup-$(date -I)
+k get pod -A -o wide > pods.txt
+k get deployment -A > deployment.txt
+
+##################################################################################################################################
+
+Designing a Disaster Recovery Strategy: https://docs.mirantis.com/containers/v3.0/dockeree-ref-arch/deploy-manage/dr-strategy.html
+Swarm Disaster recovery: htt  ps://docs.mirantis.com/mke/3.3/ops/disaster-recovery/disaster-recovery-swarm.html
+Backup Swarm: https://docs.mirantis.com/mke/3.4/ops/disaster-recovery/backup-swarm.html
+MKE Disaster recovery: https://docs.mirantis.com/mke/3.4/ops/disaster-recovery/disaster-recovery-mke.html
+Backup MKE: https://docs.mirantis.com/mke/3.4/ops/disaster-recovery/backup-mke.html
+MSR Disaster recovery: https://docs.mirantis.com/msr/2.9/ops/disaster-recovery/overview.html
+Backup MSR: https://docs.mirantis.com/msr/2.9/ops/disaster-recovery/create-a-backup.html

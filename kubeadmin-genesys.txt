@@ -1,0 +1,67 @@
+10.75.154.196   azgrgencxi001
+10.75.154.197   azgrgencxi002
+10.75.154.198   azgrgencxi003
+
+
+'SELINUX=disabled' in  /etc/selinux/config
+
+
+sudo kubeadm reset -f
+sudo rm -rf /etc/cni/net.d
+sudo rm -rf /var/lib/etcd
+sudo rm -rf /var/lib/kubelet/*
+sudo rm -rf /etc/kubernetes
+sudo rm -rf ~/.kube
+sudo rm -rf /var/lib/cni/
+
+iptables -F && iptables -X
+iptables -t nat -F && iptables -t nat -X
+iptables -t raw -F && iptables -t raw -X
+iptables -t mangle -F && iptables -t mangle -X
+
+sudo yum remove -y kubeadm kubelet kubectl
+rm -rf ~/.kube
+rm -rf /etc/cni /etc/kubernetes rm -f /etc/apparmor.d/docker /etc/systemd/system/etcd*
+rm -rf /var/lib/dockershim /var/lib/etcd /var/lib/kubelet \
+         /var/lib/etcd2/ /var/run/kubernetes
+		 
+sudo systemctl stop crio
+sudo yum remove -y cri-o
+sudo rm -rf /etc/cni/net.d/
+sudo rm -rf /var/lib/containers/
+sudo rm -rf /etc/crio/
+sudo rm -rf /run/crio/
+sudo rm -rf /var/lib/crio/
+
+sudo rm -rf /var/run/kubernetes
+sudo rm -rf /etc/systemd/system/kubelet.service.d
+		 
+
+systemctl daemon-reload
+systemctl enable --now crio
+systemctl status crio
+
+systemctl enable kubelet --now
+
+for i in $(ls -1 *.tar); do podman load -i $i; done
+podman system reset
+
+https://v1-30.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/#cri-o
+
+mkdir /run/systemd/resolve && ln -s /usr/lib/systemd/resolv.conf /run/systemd/resolve/resolv.conf
+
+spec:
+  containers:
+  - name: gcxi-container
+    image: your-image
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+	  	  
+helm install ingress-nginx . --set controller.hostNetwork=true,controller.hostPort.enabled=true,controller.kind=DaemonSet,tcp.34952=genesys/gcxi:mstr,tcp.8180=genesys/gcxi:metrics -n ingress-nginx --create-namespace
+registry.k8s.io/ingress-nginx/kube-webhook-certgen              v1.4.1		  
+
+Loaded image: k8s.gcr.io/ingress-nginx/controller:v1.9.0
+Loaded image: k8s.gcr.io/ingress-nginx/kube-webhook-certgen:v1.1.1
+
+export PS1="\[\e[31m\][\[\e[m\]\[\e[38;5;172m\]\u\[\e[m\]@\[\e[38;5;153m\]\h\[\e[m\] \[\e[38;5;214m\]\W\[\e[m\]\[\e[31m\]]\[\e[m\]\\$ "

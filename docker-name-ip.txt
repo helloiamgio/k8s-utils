@@ -1,0 +1,1 @@
+docker ps --format "{{.Names}}" | while read name; do echo "$name: $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $name)"; done

@@ -1,0 +1,5 @@
+oc get pods -n strategyone --no-headers \
+-o custom-columns="Pod:.metadata.name,CPU Requests:.spec.containers[*].resources.requests.cpu,CPU Limits:.spec.containers[*].resources.limits.cpu,Memory Requests:.spec.containers[*].resources.requests.memory,Memory Limits:.spec.containers[*].resources.limits.memory"
+
+
+

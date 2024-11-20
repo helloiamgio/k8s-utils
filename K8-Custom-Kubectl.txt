@@ -1,0 +1,12 @@
+alias getpodfail='kubectl get pods -o custom-columns="POD:.metadata.name,NODE:.spec.nodeName,CONTAINER_FAIL_MESSAGE:.status.containerStatuses[*].lastState.terminated.message"'
+
+alias getpodcontainerstatus=""
+
+alias getingress="kubectl get ingress -o custom-columns="INGRESS:.metadata.name,HOST:.spec.rules[*].host" -n kube-system"
+
+alias gethostpaths="kubectl get pods -o custom-columns='NAMESPACE:.metadata.namespace,PODNAME:.metadata.name,HOSTPATHS:.spec.volumes[*].hostPath.path'"
+
+alias getpodresource='kubectl get pods -o custom-columns="POD:.metadata.name,CPU_REQUEST:.spec.containers[*].resources.requests.cpu,MEM_REQUEST:.spec.containers[*].resources.requets.memory"'
+
+kubectl get nodes -o custom-columns=NAME:.metadata.name,INTERNAL-IP:.status.addresses[0].address
+

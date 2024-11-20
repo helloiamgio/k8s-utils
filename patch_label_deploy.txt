@@ -1,0 +1,1 @@
+oc patch deployment my-deployment --type merge -p '{"spec": {"template": {"metadata": {"labels": {"my-label": "my-value"}}}}}'
