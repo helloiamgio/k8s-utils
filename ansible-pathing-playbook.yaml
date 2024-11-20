@@ -1,0 +1,82 @@
+---
+- name: Aggiornamento di sicurezza, stop di Docker e riavvio della VM
+  hosts: all
+  become: yes
+  serial: 1
+
+  vars:
+    confirm_reboot: false
+
+  tasks:
+    - name: Check per la presenza di pacchetti di sicurezza da aggiornare
+      shell: yum updateinfo list security | grep -c 'RHSA'
+      register: security_packages_count
+      changed_when: false
+      failed_when: security_packages_count.rc != 0 and security_packages_count.stdout != "0"
+      
+    - name: Stampa la lista delle patch di sicurezza in un file txt
+      shell: yum updateinfo list security > /var/tmp/lista-rhsa-$(date -I).txt && cat /var/tmp/lista-rhsa-$(date -I).txt 
+      when: security_packages_count.stdout|int > 0  
+
+    - name: Ferma Docker
+      systemd:
+        name: docker
+        state: stopped
+      when: security_packages_count.stdout|int > 0
+
+    - name: Esegui l'aggiornamento solo per le patch di sicurezza
+      yum:
+        name: "*"
+        state: latest
+        security: yes
+        exclude: "docker*,containerd*"
+        install_opts: "--nobest"
+      when: security_packages_count.stdout|int > 0
+
+    - name: Chiedi conferma per procedere al riavvio del nodo
+      pause:
+        prompt: "Premi INVIO per procedere al riavvio del nodo."
+      register: next_confirmation
+      when: security_packages_count.stdout|int > 0 and confirm_reboot == false
+      tags: always
+    
+    - name: Imposta la conferma per il riavvio del prossimo nodo
+      set_fact:
+        confirm_reboot: "{{ next_confirmation.user_input is defined }}"
+      when: next_confirmation.user_input is defined
+      tags: always
+    
+    - name: Riavvia la VM in modalità rolling
+      reboot:
+        pre_reboot_delay: 10
+        post_reboot_delay: 20
+      when: security_packages_count.stdout|int > 0 and confirm_reboot == true
+      tags: always
+      
+    - name: Attendi il ripristino dei container Docker
+      shell: |
+        while [ $(docker ps --filter "name=ucp" --filter "status=running" --filter "health=healthy" | grep -v CONTAINER | wc -l) -ne 1 ]
+        do
+          echo "Restart in progress..."
+          sleep 2
+        done
+        echo "### Restart COMPLETED ###" && docker ps
+      register: container_info
+      changed_when: false
+      when: security_packages_count.stdout|int > 0
+      ignore_errors: true
+      tags: always
+  
+    - name: Chiedi conferma per procedere al riavvio del prossimo nodo
+      pause:
+        prompt: "Premi INVIO per procedere al riavvio del prossimo nodo."
+      register: next_confirmation
+      when: security_packages_count.stdout|int > 0 and confirm_reboot == false
+      tags: always
+    
+    - name: Imposta la conferma per il riavvio del prossimo nodo
+      set_fact:
+        confirm_reboot: "{{ next_confirmation.user_input is defined }}"
+      when: next_confirmation.user_input is defined
+      tags: always
+    

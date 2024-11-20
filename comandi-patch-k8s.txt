@@ -1,0 +1,95 @@
+### ORDINE - 1) MASTER 2) DTR 3) WORKER
+
+### CHECK MASTER LEADER (lasciare il LEADER per ultimo)
+docker node ls -f "role=manager" | tail -n+2 | grep -i leader
+
+### DA NODO MASTER LEADER ###
+watch -n1 -d 'clear ; docker node ls ; echo -e ; su - kadmin -c "kubectl get nodes"' ; echo -e
+watch 'su - kadmin -c "kubectl get pods -A | egrep -v 'Running|Completed'"'
+kubectl get pods -A -o wide | egrep -v 'Running|Completed'
+kubectl get pods -A -o wide | grep '0/1'
+
+----------------------------------------------------------------------------------------------------------------------
+
+### DA NODI MASTER & WORKER + DTR ### 
+yum updateinfo list security > /var/tmp/lista-rhsa-$(date -I).txt && cat /var/tmp/lista-rhsa-$(date -I).txt 
+systemctl stop docker
+yum update --security --exclude=docker* --exclude=containerd* -y && reboot
+
+#ENGINE=$(docker version -f '{{.Server.Version}}')
+#systemctl stop docker
+#tar cvzf "./swarm-${ENGINE}-$(hostname -s)-$(date +%s%z).tgz" /var/lib/docker/swarm/
+#tar cvzf "./swarm-${ENGINE}-$(hostname -s)-$(date +%s%z).tgz" /RGP/docker/swarm/
+#yum update --security --exclude=docker* --exclude=containerd* -y && reboot
+
+----------------------------------------------------------------------------------------------------------------------
+
+### NODO RESTARTATO
+sudo -i
+while [ $(docker ps | grep Up | egrep -i 'starting|unhealthy' | grep -v CONTAINER |wc -l) -ne 0 ]
+do
+	clear
+	echo "Restart in progress..."
+	sleep 2
+done ; clear ; echo "### Restart COMPLETED ###" && docker ps
+
+
+### WORKER 
+docker node ls 
+NODE_NAME=<prendere nome o ID dal comando sopra>
+docker node update --availability drain $NODE_NAME
+docker node update --availability active $NODE_NAME
+
+---------------------------------------------------------------------------------------------------------------------
+
+### MKE BACKUP da MASTER ###
+docker container run \
+    --rm \
+    --log-driver none \
+    --name ucp \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /var/tmp:/backup \
+    mirantis/ucp:3.3.4 backup \
+    --file $(hostname).tar \
+    --passphrase "secret12chars" \
+    --include-logs=false
+	
+gpg --decrypt /var/tmp/$(hostname).tar | tar --list
+
+### DTR BACKUP da Worker DTR ###
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-') && echo $REPLICA_ID
+sudo tar -cvf /var/tmp/image-backup.tar /var/lib/docker/volumes/dtr-registry-$REPLICA_ID
+
+DTR_VERSION=$(docker container inspect $(docker container ps -f name=dtr-registry -q) | \
+  grep -m1 -Po '(?<=DTR_VERSION=)\d.\d.\d'); \
+REPLICA_ID=$(docker ps --format '{{.Names}}' -f name=dtr-rethink | cut -f 3 -d '-'); \
+read -p 'mke-url (The MKE URL including domain and port): ' UCP_URL; \
+read -p 'mke-username (The MKE administrator username): ' UCP_ADMIN; \
+read -sp 'mke password: ' UCP_PASSWORD; \
+docker run --log-driver none -i --rm \
+  --env UCP_PASSWORD=$UCP_PASSWORD \
+  mirantis/dtr:2.9.7 backup \
+  --ucp-username $UCP_ADMIN \
+  --ucp-url $UCP_URL \
+  --ucp-insecure-tls \
+  --existing-replica-id $REPLICA_ID > dtr-metadata-${DTR_VERSION}-backup-$(date +%Y%m%d-%H_%M_%S).tar
+  
+------------------------------------------------------------------------------------------------------------------------
+
+### REMOVE DTR REPLICA  
+docker run -it --rm mirantis/dtr:2.8.4 remove \
+  --existing-replica-id <healthy-replica-id> \
+  --replica-ids <unhealthy-replica-id> \
+  --ucp-insecure-tls \
+  --ucp-url <mke-url> \
+  --ucp-username <user> \
+  --ucp-password <password>
+
+### JOIN DTR REPLICA
+docker run -it --rm \
+  mirantis/dtr:2.9.7 join \
+  --ucp-node  \
+  --ucp-insecure-tls \
+  --existing-replica-id 
+  
+  

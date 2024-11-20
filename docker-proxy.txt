@@ -1,0 +1,14 @@
+mkdir /etc/systemd/system/docker.service.d ; cd /etc/systemd/system/docker.service.d
+
+
+cat <<EOF > http-proxy.conf
+[Service]
+Environment="HTTP_PROXY=http://user01:password@10.10.10.10:8080/"
+Environment="HTTPS_PROXY=https://user01:password@10.10.10.10:8080/"
+Environment="NO_PROXY= hostname.example.com,172.10.10.10"
+EOF
+
+systemctl daemon-reload
+systemctl restart docker
+
+systemctl show docker --property Environment 

@@ -1,0 +1,7 @@
+ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu | head
+kubectl exec -i POD_NAME -- jstack 1 > threadDump.tdump
+
+
+
+ps -C java -L -o pcpu,cpu,nice,state,cputime,pid,tid > thread-usage.txt
+jstack <pid> > thread-dump.txt

@@ -1,0 +1,9 @@
+AUTHTOKEN=$(curl -sk -d \
+'{"username":"docker","password":"HYcARr6sBzbyWW"}' \
+https://multichannel-ucp-kb2.gribankprd.dmz/auth/login | cut -f4 -d'"')
+
+echo $AUTHTOKEN
+
+curl -X GET "https://multichannel-ucp-kb2.gribankprd.dmz/nodes" -H  "accept: application/json" -H 'Authorization: Bearer 2c5d9aee-daca-4ee9-9ea7-d8a3caf53b7e'
+
+curl -X GET "https://multichannel-ucp-kb2.gribankprd.dmz/nodes/grpd-kb2-pv21" -H  "accept: application/json" -H 'Authorization: Bearer 2c5d9aee-daca-4ee9-9ea7-d8a3caf53b7e'

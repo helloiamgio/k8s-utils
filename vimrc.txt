@@ -1,0 +1,40 @@
+~/.vimrc, comments are for you to understand options, there are long options but I listed short ones to help with speed.
+
+set et # expandtab (use space character when tab key used) *
+set ts=2 # tabstop *
+set sw=2 # shiftwidth *
+set sts=2 # softtabstop (Let backspace delete indent **
+set ai # autoindent (Indent at the same level of the previous line)
+set si # smart indent
+set hls # highlightsearch (Highlight search terms)
+set ic # ignorecase when searching in vim
+set bg=dark # Assume a dark background (better color scheme)
+set nu # show line numbers
+syntax on # syntax highlighting
+
+* preconfigured in the exam environment
+** minimum nice to have
+
+
+
+:retab 				--> sostituisce tutti i tab con spazi
+:set relativenumber --> mostra num linee
+:set paste 			--> permette di copiare il contenuto di uno yaml da pagina internet senza tab
+:set list 			--> attiva visualizzazione di caratteri invisibili (tab)
+:vsp or :sp			--> split verticale | orizzontale --> CTRL+ww to switch between the areas 
+:set cursorcolumn   --> visualizza colonna per indentare
+
+SHIFT + V --> VISUAL SELECT
+
+cat <<EOF > ~/.vimrc
+set ts=2 sts=2 sw=2
+set expandtab
+set number ruler
+set autoindent smartindent
+syntax enable
+filetype plugin indent on
+EOF
+
+---
+
+dbi-services.com/blog/vim-tips-tricks-for-the-kubernetes-cka-exam/

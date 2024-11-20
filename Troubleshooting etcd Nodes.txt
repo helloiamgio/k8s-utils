@@ -1,0 +1,81 @@
+
+ETCD check
+
+collegarsi sul nodo master1
+
+per esempio ambiente prod-pci-dr
+
+ ssh user@p1kb8pkm01.sisalpay5group.local
+ 
+ sudo su -
+ 
+ 
+ 
+
+1. Check Connectivity on Port TCP/2379
+
+Command:
+
+for endpoint in $(docker exec etcd /bin/sh -c "etcdctl member list | cut -d, -f5"); do
+   echo "Validating connection to ${endpoint}/health"
+   docker run --net=host -v $(docker inspect kubelet --format '{{ range .Mounts }}{{ if eq .Destination "/etc/kubernetes" }}{{ .Source }}{{ end }}{{ end }}')/ssl:/etc/kubernetes/ssl:ro appropriate/curl -s -w "\n" --cacert $(docker exec etcd printenv ETCDCTL_CACERT) --cert $(docker exec etcd printenv ETCDCTL_CERT) --key $(docker exec etcd printenv ETCDCTL_KEY) "${endpoint}/health"
+done
+
+
+
+Example output:
+
+Validating connection to https://IP:2379/health
+{"health": "true"}
+Validating connection to https://IP:2379/health
+{"health": "true"}
+Validating connection to https://IP:2379/health
+{"health": "true"}
+
+2. Check Connectivity on Port TCP/2380
+
+Command:
+
+for endpoint in $(docker exec etcd /bin/sh -c "etcdctl member list | cut -d, -f4"); do
+  echo "Validating connection to ${endpoint}/version";
+  docker run --net=host -v $(docker inspect kubelet --format '{{ range .Mounts }}{{ if eq .Destination "/etc/kubernetes" }}{{ .Source }}{{ end }}{{ end }}')/ssl:/etc/kubernetes/ssl:ro appropriate/curl --http1.1 -s -w "\n" --cacert $(docker exec etcd printenv ETCDCTL_CACERT) --cert $(docker exec etcd printenv ETCDCTL_CERT) --key $(docker exec etcd printenv ETCDCTL_KEY) "${endpoint}/version"
+done
+output ok => Validating connection to https://10.74.32.6:2380/version
+{"etcdserver":"3.4.13","etcdcluster":"3.4.0"}
+Validating connection to https://10.74.32.5:2380/version
+{"etcdserver":"3.4.13","etcdcluster":"3.4.0"}
+Validating connection to https://10.74.32.7:2380/version
+{"etcdserver":"3.4.13","etcdcluster":"3.4.0"}
+[root@p1kb8pkm01 ~]#
+
+se non vi è risposta dai due master(2 e 3) 
+
+collegarsi su quel master che non risponde ed eseguire da root
+
+docker restart etcd kube-apiserver
+
+uscire, collegarsi sul nodo master1 e rieseguire i due cicli for.
+
+infine eseguire sempre sul master il controllo di etcd da root
+
+
+docker logs -f etcd --tail=100
+
+dovrebbe rispondere così
+
+2023-01-27 09:58:30.490002 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:34.096843 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:35.510453 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:40.495161 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:46.416120 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:47.081381 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:58:49.097860 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:59:01.459171 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:59:04.097436 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:59:11.439773 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+2023-01-27 09:59:16.445104 I | etcdserver/api/etcdhttp: /health OK (status code 200)
+
+check master
+
+docker exec -e ETCDCTL_ENDPOINTS=$(docker exec etcd /bin/sh -c "etcdctl member list | cut -d, -f5 | sed -e 's/ //g' | paste -sd ','") etcd etcdctl endpoint status --write-out table
+

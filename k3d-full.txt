@@ -1,0 +1,476 @@
+#!/bin/bash
+
+# Install Docker on Rocky Linux 9
+
+# Install necessary dependencies
+
+sudo dnf install -y dnf-plugins-core
+yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-enginer-buildx-plugin docker-compose-plugin
+
+ yum install -y yum-utils
+
+sudo dnf config-manager \
+    --add-repo \
+    https://download.docker.com/linux/fedora/docker-ce.repo
+
+sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+sudo chmod 666 /var/run/docker.sock
+
+# Start and enable Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
+# Install k3d
+curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+
+# Scaricare kubectx
+sudo curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
+sudo chmod +x /usr/local/bin/kubectx
+
+# Scaricare kubens
+sudo curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubens -o /usr/local/bin/kubens
+sudo chmod +x /usr/local/bin/kubens
+
+# Aggiungere la directory dei binari al PATH
+echo "export PATH=$PATH:/usr/local/bin" >> ~/.bashrc
+
+# Create a k3d cluster with 1 master and 2 workers
+k3d cluster create k3s-cluster --workers 2 \
+  --worker-cpu 2 --worker-memory 4096 --k3s-arg "--disable=traefik@server:0"
+
+# Start the cluster
+k3d cluster start k3s-cluster
+
+# Get the kubeconfig for the cluster
+export KUBECONFIG="$(k3d get-kubeconfig --name='k3s-cluster')"
+
+# Install metal-lb
+kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/metallb.yaml
+
+# Create a configMap for metal-lb
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.0.240-192.168.0.250
+EOF
+
+# Install cert-manager
+kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.2.0/cert-manager.crds.yaml
+kubectl create namespace cert-manager
+kubectl label namespace cert-manager certmanager.k8s.io/disable-validation="true"
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.2.0/cert-manager.yaml
+
+# Create a ClusterIssuer for cert-manager
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  namespace: cert-manager
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: middlewareadmins.it@accenture.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
+
+# Install nginx ingress controller
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.41.2/deploy/static/provider/bare/deploy.yaml
+
+# Deploy della dashboard di Kubernetes
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.4/aio/deploy/recommended.yaml
+
+# Creazione SA dashboard
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+EOF
+# Generazione token dashboard
+kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+
+# Creazione di un servizio per la dashboard
+kubectl create service ClusterIP kubernetes-dashboard --tcp=443:443
+
+# Create the Prometheus namespace
+kubectl create namespace monitoring
+
+# Deploy the Prometheus operator
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+kubectl apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/release-0.42/bundle.yaml
+
+# Deploy Prometheus instance
+kubectl apply -f - <<EOF
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus-acn
+  namespace: monitoring
+spec:
+  replicas: 2
+  serviceAccountName: prometheus
+  ruleSelector:
+    matchLabels:
+      role: prometheus-acn
+  resources:
+    requests:
+      memory: 400Mi
+  serviceMonitorSelector:
+    matchLabels:
+      role: prometheus-acn
+  retention: "24h"
+EOF
+
+# Deploy Grafana
+kubectl apply -f https://raw.githubusercontent.com/grafana/grafana-operator/master/deploy/crds/grafana_v1alpha1_grafana_crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/grafana/grafana-operator/master/deploy/operator.yaml
+kubectl apply -f - <<EOF
+apiVersion: grafana.com/v1alpha1
+kind: Grafana
+metadata:
+  name: grafana-acn
+  namespace: monitoring
+spec:
+  size: 2
+  version: 7.1.0
+  adminPassword: "Accenture01!"
+EOF
+
+---
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dashboard-acn-accenture-com-cert
+  namespace: default
+spec:
+  secretName: dashboard-acn-accenture-com-tls
+  commonName: dashboard-acn.accenture.com
+  dnsNames:
+    - dashboard-acn.accenture.com
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  acme:
+    config:
+    - http01:
+        ingressClass: nginx
+      domains:
+      - dashboard-acn.accenture.com
+EOF
+	  
+---
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-acn-accenture-com-cert
+  namespace: default
+spec:
+  secretName: grafana-acn-accenture-com-tls
+  commonName: grafana-acn.accenture.com
+  dnsNames:
+    - grafana-acn.accenture.com
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  acme:
+    config:
+    - http01:
+        ingressClass: nginx
+      domains:
+EOF
+		  		  
+---
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  annotations:
+    cert-manager.io/issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - grafana-acn.accenture.com
+    secretName: grafana-tls
+  rules:
+  - host: grafana-acn.accenture.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              name: http
+EOF
+			  
+---
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - dashboard-acn.accenture.com
+    secretName: dashboard-tls
+  rules:
+  - host: dashboard-acn.accenture.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kubernetes-dashboard
+            port:
+EOF
+---
+# Installing Jenkins on Kubernetes
+kubectl create namespace devops-tools
+
+kubectl apply -f - <<EOF
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-admin
+rules:
+  - apiGroups: [""]
+    resources: ["*"]
+    verbs: ["*"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-admin
+  namespace: devops-tools
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jenkins-admin
+subjects:
+- kind: ServiceAccount
+  name: jenkins-admin
+  namespace: devops-tools
+  
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jenkins-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: local-storage
+  claimRef:
+    name: jenkins-pv-claim
+    namespace: devops-tools
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /mnt
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - worker-node01
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins-pv-claim
+  namespace: devops-tools
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+	  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: devops-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins-server
+  template:
+    metadata:
+      labels:
+        app: jenkins-server
+    spec:
+      securityContext:
+            fsGroup: 1000 
+            runAsUser: 1000
+      serviceAccountName: jenkins-admin
+      containers:
+        - name: jenkins
+          image: jenkins/jenkins:lts
+          resources:
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+            requests:
+              memory: "500Mi"
+              cpu: "500m"
+          ports:
+            - name: httpport
+              containerPort: 8080
+            - name: jnlpport
+              containerPort: 50000
+          livenessProbe:
+            httpGet:
+              path: "/login"
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: "/login"
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: jenkins-data
+              mountPath: /var/jenkins_home         
+      volumes:
+        - name: jenkins-data
+          persistentVolumeClaim:
+              claimName: jenkins-pv-claim
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-service
+  namespace: devops-tools
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/path:   /
+      prometheus.io/port:   '8080'
+spec:
+  selector: 
+    app: jenkins-server
+  type: NodePort  
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 32000
+	  
+EOF
+
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jenkins
+  namespace: jenkins
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - jenkins-acn.accenture.com
+      secretName: jenkins-tls
+  rules:
+    - host: jenkins-acn.accenture.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jenkins-service
+                port:
+                  name: http
+EOF
+
+
+
+		  
+

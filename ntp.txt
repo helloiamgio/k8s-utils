@@ -1,0 +1,9 @@
+cat /etc/ntp.conf
+ntpstat
+ntpq -p
+systemctl stop ntpd
+ntpdate -u pool.ntp.org
+systemctl start ntpd
+
+
+#ntpd -gq

@@ -1,0 +1,38 @@
+http_proxy="http://proxy.example.com:8080"
+https_proxy="http://proxy.example.com:8080"
+no_proxy="localhost,127.0.0.1"
+
+kubectl create configmap proxy-config \
+  --from-literal=http_proxy="$http_proxy" \
+  --from-literal=HTTP_PROXY="$http_proxy" \
+  --from-literal=https_proxy="$https_proxy" \
+  --from-literal=HTTPS_PROXY="$http_proxy" \
+  --from-literal=no_proxy="$no_proxy" \
+  --from-literal=NO_PROXY="$no_proxy"
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-http-proxy
+spec:
+  containers:
+  - name: example-container
+    image: alpine:latest
+    envFrom:
+      - configMapRef:
+          name: proxy-config
+
+http_proxy="http://proxy.example.com:8080"
+https_proxy="http://proxy.example.com:8080"
+no_proxy="<VPC CIDR RANGE>,<EKS Service CIDR Range>,<VPC Endpont DNS Names>,localhost,127.0.0.1"
+
+kubectl -n kube-system create confimap proxy-config \
+  --from-literal=http_proxy="$http_proxy" \
+  --from-literal=HTTP_PROXY="$http_proxy" \
+  --from-literal=https_proxy="$https_proxy" \
+  --from-literal=HTTPS_PROXY="$http_proxy" \
+  --from-literal=no_proxy="$no_proxy" \
+  --from-literal=NO_PROXY="$no_proxy"
+
+kubectl set env daemonset/kube-proxy --namespace=kube-system --from=configmap/proxy-config --containers='*'
+kubectl set env daemonset/aws-node --namespace=kube-system --from=configmap/proxy-config 
